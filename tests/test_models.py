@@ -1,5 +1,5 @@
 import numpy as np
-from modules.kinetics import analyze_kinetics
+from modules.kinetics import analyze_kinetics, compare_nonlinear_models
 from modules.parameters import calculate_characteristic_times
 from modules.arrhenius import analyze_arrhenius
 
@@ -38,3 +38,18 @@ def test_arrhenius_recovery():
     result = analyze_arrhenius(temps,kvals)
     assert abs(result["Ea_J_mol"]-ea) < 1e-5
     assert abs(result["A"]/A-1) < 1e-8
+
+
+def test_nonlinear_model_comparison_returns_information_criteria():
+    t = np.array([0, 1, 2, 3, 4, 5], float)
+    c = 100*np.exp(-0.12*t)
+    comparison, best = compare_nonlinear_models(t, c)
+    assert best == "Orden uno"
+    assert "aic" in comparison[best]
+    assert "bic" in comparison[best]
+    assert len(comparison[best]["residuals"]) == len(t)
+
+def test_negative_time_is_rejected():
+    import pytest
+    with pytest.raises(ValueError, match="tiempo no puede ser negativo"):
+        analyze_kinetics([-1, 0, 1], [100, 95, 90])
