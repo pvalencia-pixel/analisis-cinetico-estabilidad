@@ -69,7 +69,7 @@ if page == "Análisis cinético":
                          "R² transformado":r["r2"], "k":r["k"], "Unidad de k":r["k_unit"],
                          "RMSE concentración":r["rmse_original"], "k positiva":r["valid_k"]})
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
-        st.info("Candidato por R²: " + result["_summary"]["best_by_r2"] + ". Contraste por menor RMSE: " + result["_summary"]["best_by_rmse"] + ".")
+        st.info("Candidato por R²: " + result["_summary"]["best_by_r2"] + ". Contraste por menor RMSE: " + result["_summary"]["best_by_rmse_linearized"] + ".")
         st.warning(result["_summary"]["warning"])
         st.subheader("Comparación no lineal en concentración original")
         comparison = st.session_state.get("nonlinear_comparison", {})
