@@ -4,7 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-from modules.kinetics import analyze_kinetics, nonlinear_refit
+from modules.kinetics import analyze_kinetics, nonlinear_refit, compare_nonlinear_models
 from modules.parameters import calculate_characteristic_times
 from modules.arrhenius import analyze_arrhenius, predict_k
 from modules.stability import predict_stability
@@ -13,7 +13,7 @@ from utils.validation import load_experimental_file, clean_time_concentration
 
 st.set_page_config(page_title="Análisis cinético y estabilidad", page_icon="🧪", layout="wide")
 st.title("🧪 Análisis cinético y predicción de estabilidad")
-st.caption("Herramienta de fisicoquímica farmacéutica | Versión 1.0")
+st.caption("Herramienta de fisicoquímica farmacéutica | Versión 2.0")
 
 with st.sidebar:
     st.header("Navegación")
@@ -45,6 +45,9 @@ if page == "Análisis cinético":
             result = analyze_kinetics(df.time, df.concentration)
             st.session_state["kinetics"] = result
             st.session_state["data"] = df
+            comparison, best_aic = compare_nonlinear_models(df.time, df.concentration)
+            st.session_state["nonlinear_comparison"] = comparison
+            st.session_state["best_by_aic"] = best_aic
             st.success("Análisis completado.")
         except Exception as e:
             st.error(str(e))
@@ -62,6 +65,21 @@ if page == "Análisis cinético":
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
         st.info("Candidato por R²: " + result["_summary"]["best_by_r2"] + ". Contraste por menor RMSE: " + result["_summary"]["best_by_rmse"] + ".")
         st.warning(result["_summary"]["warning"])
+        st.subheader("Comparación no lineal en concentración original")
+        comparison = st.session_state.get("nonlinear_comparison", {})
+        comparison_rows = []
+        for name, fit in comparison.items():
+            if "error" in fit:
+                comparison_rows.append({"Modelo": name, "Estado": fit["error"]})
+            else:
+                comparison_rows.append({
+                    "Modelo": name, "R² original": fit["r2_original"],
+                    "RMSE": fit["rmse"], "AIC": fit["aic"], "BIC": fit["bic"]
+                })
+        st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True)
+        if "best_by_aic" in st.session_state:
+            st.success("Mejor ajuste no lineal según AIC: " + st.session_state["best_by_aic"] + ". Un AIC menor indica mejor equilibrio entre ajuste y complejidad dentro de estos modelos.")
+        st.caption("AIC y BIC solo deben compararse entre modelos ajustados a los mismos datos y en la misma escala de respuesta.")
         st.subheader("3. Gráficas integradas")
         tabs = st.tabs(["[A] vs tiempo", "ln[A] vs tiempo", "1/[A] vs tiempo"])
         transforms = [lambda x:x, np.log, lambda x:1/x]
@@ -78,8 +96,9 @@ if page == "Análisis cinético":
                 st.write(f"Pendiente = {r['slope']:.6g} | Intercepto = {r['intercept']:.6g} | R² = {r['r2']:.6f}")
                 st.latex(f"y = {r['slope']:.6g}t + ({r['intercept']:.6g})")
         st.subheader("4. Parámetros y ajuste no lineal")
+        default_model = st.session_state.get("best_by_aic", result["_summary"]["best_by_r2"])
         chosen = st.selectbox("Modelo para calcular parámetros", ["Orden cero","Orden uno","Orden dos"],
-                              index=["Orden cero","Orden uno","Orden dos"].index(result["_summary"]["best_by_r2"]))
+                              index=["Orden cero","Orden uno","Orden dos"].index(default_model))
         rr = result[chosen]
         times = calculate_characteristic_times(rr["order"], rr["k"], rr["c0_fit"])
         c1,c2,c3,c4 = st.columns(4)
@@ -87,7 +106,12 @@ if page == "Análisis cinético":
             col.metric(key, f"{val:.4g}")
         try:
             nl = nonlinear_refit(data.time, data.concentration, rr["order"])
-            st.write(f"Ajuste no lineal en concentración original: C₀ = {nl['c0']:.6g}; k = {nl['k']:.6g}; R² original = {nl['r2_original']:.6f}; RMSE = {nl['rmse']:.6g}.")
+            st.write(f"Ajuste no lineal en concentración original: C₀ = {nl['c0']:.6g}; k = {nl['k']:.6g}; R² original = {nl['r2_original']:.6f}; RMSE = {nl['rmse']:.6g}; AIC = {nl['aic']:.4f}; BIC = {nl['bic']:.4f}.")
+            residual_df = pd.DataFrame({"Tiempo": data.time, "Residuo": nl["residuals"]})
+            residual_fig = px.scatter(residual_df, x="Tiempo", y="Residuo", title="Residuos del ajuste: " + chosen)
+            residual_fig.add_hline(y=0, line_dash="dash")
+            st.plotly_chart(residual_fig, use_container_width=True)
+            st.caption("Los residuos deben distribuirse alrededor de cero sin patrones sistemáticos evidentes.")
         except Exception as e:
             st.warning(f"No fue posible completar el ajuste no lineal: {e}")
         st.subheader("5. Interpretación automática")
