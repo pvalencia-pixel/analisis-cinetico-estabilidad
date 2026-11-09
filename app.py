@@ -26,7 +26,13 @@ if page == "Análisis cinético":
     mode = st.radio("Método de ingreso", ["Manual", "Cargar archivo"], horizontal=True)
     if mode == "Manual":
         default = pd.DataFrame({"Tiempo": [0,10,20,30,40,50], "Concentración": [100,95,90,85,80,75]})
-        edited = st.data_editor(default, num_rows="dynamic", use_container_width=True)
+        edited = st.data_editor(
+            default, num_rows="dynamic", use_container_width=True,
+            column_config={
+                "Tiempo": st.column_config.NumberColumn("Tiempo", format="%.6f", step=0.01),
+                "Concentración": st.column_config.NumberColumn("Concentración", format="%.6f", step=0.01)
+            }
+        )
         df = edited.rename(columns={"Tiempo":"time", "Concentración":"concentration"})
     else:
         uploaded = st.file_uploader("Cargue un CSV o Excel", type=["csv","xlsx","xls"])
@@ -121,7 +127,13 @@ elif page == "Arrhenius y predicción":
     st.subheader("1. Datos de temperatura y constantes cinéticas")
     st.write("Introduzca k obtenidas experimentalmente para el mismo orden cinético y con unidades coherentes.")
     default_a = pd.DataFrame({"Temperatura (°C)":[40,50,60,70], "k":[0.002,0.004,0.008,0.015]})
-    arr_df = st.data_editor(default_a, num_rows="dynamic", use_container_width=True)
+    arr_df = st.data_editor(
+        default_a, num_rows="dynamic", use_container_width=True,
+        column_config={
+            "Temperatura (°C)": st.column_config.NumberColumn("Temperatura (°C)", format="%.4f", step=0.1),
+            "k": st.column_config.NumberColumn("k", format="%.8f", step=0.0001)
+        }
+    )
     if st.button("Ajustar Arrhenius", type="primary"):
         try:
             ar = analyze_arrhenius(arr_df["Temperatura (°C)"], arr_df["k"])
@@ -141,7 +153,7 @@ elif page == "Arrhenius y predicción":
         fig = px.scatter(arr_table, x="1/T (K⁻¹)", y="ln(k)", trendline="ols", title="Gráfica de Arrhenius")
         st.plotly_chart(fig, use_container_width=True)
         st.write(f"Pendiente = {ar['slope']:.6g}; intercepto = {ar['intercept']:.6g}")
-        target = st.number_input("Temperatura objetivo (°C)", value=25.0, step=1.0)
+        target = st.number_input("Temperatura objetivo (°C)", value=25.0, step=0.1, format="%.4f")
         kp = float(predict_k(ar, [target])[0])
         st.metric(f"k estimada a {target:.2f} °C", f"{kp:.6g}")
         st.session_state["arrhenius"]["predicted_k"] = kp
@@ -153,8 +165,8 @@ elif page == "Arrhenius y predicción":
             order_name = st.selectbox("Orden cinético para proyectar", ["Orden cero","Orden uno","Orden dos"],
                                       index=["Orden cero","Orden uno","Orden dos"].index(default_order))
             kr = kin[order_name]
-            c0 = st.number_input("Concentración inicial C₀", min_value=0.000001, value=float(kr["c0_fit"]))
-            horizon = st.number_input("Horizonte de predicción", min_value=1.0, value=365.0)
+            c0 = st.number_input("Concentración inicial C₀", min_value=0.000001, value=float(kr["c0_fit"]), step=0.01, format="%.6f")
+            horizon = st.number_input("Horizonte de predicción", min_value=1.0, value=365.0, step=0.1, format="%.4f")
             unit = st.text_input("Unidad de tiempo (debe coincidir con k)", value="días")
             if st.button("Generar predicción"):
                 try:
