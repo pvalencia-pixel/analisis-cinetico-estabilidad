@@ -213,25 +213,24 @@ elif page == "Arrhenius y predicción":
 
         if "kinetics" in st.session_state:
             kin = st.session_state["kinetics"]
-            default_order = kin["_summary"]["best_by_r2"]
-            order_name = st.selectbox("Orden cinético para proyectar", ["Orden cero","Orden uno","Orden dos"],
-                                      index=["Orden cero","Orden uno","Orden dos"].index(default_order))
-            kr = kin[order_name]
-            c0 = st.number_input("Concentración inicial C₀", min_value=0.000001, value=float(kr["c0_fit"]), step=0.01, format="%.6f")
-            horizon = st.number_input("Horizonte de predicción", min_value=1.0, value=365.0, step=0.1, format="%.4f")
-            unit = st.session_state.get("time_unit", arr_time_unit)
-            if unit != arr_time_unit:
-                st.warning("La unidad de tiempo de la predicción debe coincidir con la utilizada para calcular k. Se utilizará la unidad declarada para k: " + arr_time_unit + ".")
-                unit = arr_time_unit
-            if st.button("Generar predicción"):
-                try:
-                    pred = predict_stability(kr["order"], kp, c0, np.linspace(0,horizon,150))
-                    out = pd.DataFrame({"Tiempo":pred["time"],"Concentración":pred["concentration"],"% restante":pred["remaining_percent"]})
-                    st.line_chart(out.set_index("Tiempo")["% restante"])
-                    st.dataframe(pd.DataFrame([{"Parámetro":k,"Tiempo":v,"Unidad":unit} for k,v in pred["characteristic_times"].items()]), use_container_width=True)
-                    st.download_button("Descargar predicción CSV", out.to_csv(index=False).encode("utf-8"), "prediccion_estabilidad.csv", "text/csv")
-                except Exception as e:
-                    st.error(str(e))
+            same_time_unit = st.session_state.get("time_unit") == arr_time_unit
+            same_concentration_unit = st.session_state.get("concentration_unit") == arr_conc_unit
+            if not (same_time_unit and same_concentration_unit):
+                st.warning("Para combinar el análisis cinético con Arrhenius, las unidades de tiempo y concentración deben coincidir en ambos módulos. Ajuste los selectores para que sean iguales y vuelva a analizar los datos.")
+            else:
+                kr = kin[arr_order]
+                st.caption(f"La predicción utilizará {arr_order}, con k en {arr_k_unit}.")
+                c0 = st.number_input(f"Concentración inicial C₀ ({arr_conc_unit})", min_value=0.000001, value=float(kr["c0_fit"]), step=0.01, format="%.6f")
+                horizon = st.number_input(f"Horizonte de predicción ({arr_time_unit})", min_value=1.0, value=365.0, step=0.1, format="%.4f")
+                if st.button("Generar predicción"):
+                    try:
+                        pred = predict_stability(kr["order"], kp, c0, np.linspace(0,horizon,150))
+                        out = pd.DataFrame({f"Tiempo ({arr_time_unit})":pred["time"], f"Concentración ({arr_conc_unit})":pred["concentration"], "% restante":pred["remaining_percent"]})
+                        st.line_chart(out.set_index(f"Tiempo ({arr_time_unit})")["% restante"])
+                        st.dataframe(pd.DataFrame([{"Parámetro":k,"Tiempo":v,"Unidad":arr_time_unit} for k,v in pred["characteristic_times"].items()]), use_container_width=True)
+                        st.download_button("Descargar predicción CSV", out.to_csv(index=False).encode("utf-8"), "prediccion_estabilidad.csv", "text/csv")
+                    except Exception as e:
+                        st.error(str(e))
         else:
             st.info("Para proyectar tiempos de estabilidad, primero realice un análisis cinético en la pestaña correspondiente.")
 
