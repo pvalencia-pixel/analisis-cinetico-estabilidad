@@ -59,8 +59,8 @@ if page == "Análisis cinético":
         edited = st.data_editor(
             default, num_rows="dynamic", use_container_width=True,
             column_config={
-                "Tiempo": st.column_config.NumberColumn("Tiempo", format="%.6f", step=0.01),
-                "Concentración": st.column_config.NumberColumn("Concentración", format="%.6f", step=0.01)
+                "Tiempo": st.column_config.NumberColumn(f"Tiempo ({time_unit})", format="%.6f", step=0.01),
+                "Concentración": st.column_config.NumberColumn(f"Concentración ({concentration_unit})", format="%.6f", step=0.01)
             }
         )
         df = edited.rename(columns={"Tiempo":"time", "Concentración":"concentration"})
@@ -100,7 +100,7 @@ if page == "Análisis cinético":
             rows.append({"Modelo":name, "Pendiente":r["slope"], "Intercepto":r["intercept"],
                          "R² transformado":r["r2"], "k":r["k"],
                          "Unidad de k":kinetic_constant_unit(name, st.session_state["concentration_unit"], st.session_state["time_unit"]),
-                         "RMSE concentración":r["rmse_original"], "k positiva":r["valid_k"]})
+                         f"RMSE concentración ({st.session_state['concentration_unit']})":r["rmse_original"], "k positiva":r["valid_k"]})
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
         st.info("Candidato por R²: " + result["_summary"]["best_by_r2"] + ". Contraste por menor RMSE: " + result["_summary"]["best_by_rmse_linearized"] + ".")
         st.warning(result["_summary"]["warning"])
